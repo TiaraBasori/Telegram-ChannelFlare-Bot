@@ -2,16 +2,16 @@
 // 1. 全局配置与常量定义
 // =====================
 
-const BOT_VERSION = '2.0.02'; // 版本号更新
+const BOT_VERSION = '2.0.01'; // 版本号更新
 const TRIGGER_COMMAND = 'make'; // 触发Bot重写的核心指令
 const LIMITS = {
   TEXT_LENGTH: 4096,      // Telegram 文本消息最大长度
-  CAPTION_LENGTH: 1024,   // Telegram 媒体说明最大长度
+  CAPTION_LENGTH: 4096,   // Telegram 媒体说明最大长度
   FORMAT_ENTITIES: 100,   // 格式化实体最大数量
-  INPUT_TEXT: 4096,       // 用户输入文本最大长度 [FIXED: 问题9]
-  CONFIG_STRING: 5000,    // 📋 配置数据最大长度 [FIXED: 问题9]
-  REGEX_PATTERN: 200,     // 正则表达式模式最大长度 [FIXED: 问题9]
-  REGEX_COMPLEXITY: 10    // 正则表达式最大嵌套深度 [FIXED: 问题2]
+  INPUT_TEXT: 4096,       // 用户输入文本最大长度
+  CONFIG_STRING: 5000,    // 📋 配置数据最大长度
+  REGEX_PATTERN: 200,     // 正则表达式模式最大长度
+  REGEX_COMPLEXITY: 10    // 正则表达式最大嵌套深度
 };
 
 // =====================
@@ -59,71 +59,46 @@ const DEFAULT_CONFIG = {
 };
 
 // 📖 帮助文案
-const HELP_TEXT = `<b>🤖 ChannelFlare - 频道消息美化工具 (v${BOT_VERSION})</b>
-
-我可以帮你自动美化消息、增加按钮、改写文案。完全免费，很容易上手！
-
-━━━━━━━━━━━━━━━━━
+const HELP_TEXT = `<b>🤖 ChannelFlare - 频道消息美化工具</b>
 
 <b>⚡ 快速开始</b>
+<blockquote expandable><b>初次使用必须设置频道：</b>
+将机器人添加为频道管理员,然后私聊机器人发送：
+<code>/set 频道ID或用户名</code>
+例如：<code>/set -100123456789</code> 或 <code>/set @your_channel</code></blockquote>
+<b>📝 三种使用方法</b>
+<blockquote expandable><b>1. 消息末尾加指令（临时覆盖设置）</b>
+发送消息时在最后加上指令，如：
+<code>footer on ai off button on</code>
 
-<b>1️⃣ 设置配置</b>
-私聊发送：<code>/set</code>
-进入设置面板，选择你要的功能
+<b>2. 回复消息用 /make</b>
+回复一条消息，发送：
+<code>/make ai on footer off</code>
 
-<b>2️⃣ 消息会自动处理</b>
-当你发消息到频道时，Bot会按设置自动美化
-
-<b>3️⃣ 单条消息微调</b>
-在消息末尾加指令，可以覆盖设置：
-<code>footer on</code> - 本条开启页脚
-<code>ai off</code> - 本条关闭AI改写
-<code>off</code> - 本条完全不处理
-
-━━━━━━━━━━━━━━━━━
-
-<b>🎛️ 完整指令速查表</b>
-
-<b>文案改写 (AI)</b>
+<b>3. 设置面板（推荐）</b>
+私聊发送 <code>/set</code> 进入可视化设置，一键开关所有功能</blockquote>
+<b>🎛️ 常用指令速查</b>
+<blockquote expandable><b>AI 文案改写</b>
 开启：<code>ai on</code>  关闭：<code>ai off</code>
-
 <b>关键词提取</b>
 开启：<code>keyword on</code>  关闭：<code>keyword off</code>
-
-<b>页脚 (签名)</b>
+<b>页脚签名</b>
 开启：<code>footer on</code>  关闭：<code>footer off</code>
-
 <b>转发来源显示</b>
 开启：<code>forward on</code>  关闭：<code>forward off</code>
-
 <b>底部按钮</b>
 开启：<code>button on</code>  关闭：<code>button off</code>
-
 <b>链接预览</b>
 开启：<code>preview on</code>  关闭：<code>preview off</code>
+<b>完全停止处理</b>
+<code>off</code> （单独一行）</blockquote>
 
-━━━━━━━━━━━━━━━━━
-
-<b>📝 怎么用</b>
-
-<b>方法1：消息末尾加指令</b>
-发送任何消息，在最后加上：
-<code>footer on button off</code>
-
-<b>方法2：回复消息用/make</b>
-回复消息，发送：<code>/make ai on</code>
-
-<b>方法3：进设置面板</b>
-私聊 <code>/set</code> 进入可视化设置，一键开关所有功能
-
-━━━━━━━━━━━━━━━━━
-
-<b>💡 小贴士</b>
+<b>💡 使用技巧</b>
+• 一条消息可同时用多个指令：<code>ai on footer off button on</code>
 • 不懂的地方就用 <code>/set</code> 看图形界面
-• 一条消息可以同时用多个指令：<code>ai on footer off button on</code>
-• 在群组管理员群里也可以用 <code>/set</code> 配置频道
+• 在管理群组里也可以用 <code>/set</code> 配置频道
 
-需要帮助？直接私聊发 <code>/help</code> 就能看到这个文案！`;
+需要帮助？私聊发 <code>/help</code> 随时查看此文案。`;
 
 // =====================
 // 2. 工具函数库 (Utilities)
@@ -3439,7 +3414,8 @@ ${config.footer.enabled ? `\n👀 签名预览:
 <code>频道 - https://t.me/yyy</code>
 
 💬 评论按钮:
-<code>评论 - comments</code>`;
+<code>评论 - comments</code>
+注:bot必须在频道附属评论群组内才可以使用该功能.`;
 
     const buttons = [
         { text: config.inlineButtons?.enabled ? '❌ 关闭按钮' : '✅ 开启按钮', callback_data: `panel:toggle:${chatId}:inlineButtons:${!config.inlineButtons?.enabled}` },
@@ -5528,7 +5504,7 @@ class BotHandler {
 
       // 验证权限
       if(!(await this.panelHandler.isChannelAdmin(targetId, userId))) {
-          await this.api.sendMessage(userId, {text:"🚫 ⛔ 权限不足：我必须是该📢频道的管理员，或者你在管理群里。\n请确保已将 Bot 添加为频道管理员。"});
+          await this.api.sendMessage(userId, {text:"⛔ 权限不足：我必须是该频道的管理员，或者你在管理群里。\n请确保已将 Bot 添加为频道管理员。"});
           return;
       }
 
