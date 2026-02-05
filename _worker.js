@@ -2777,8 +2777,13 @@ class PanelHandler {
       const chatIdStr = String(chatId);
       const userIdStr = String(userId);
 
-      // 验证格式：chatId 应该是数字或带-100前缀的数字
-      if (!/^-?\d+$/.test(chatIdStr)) {
+      // 🔧 修复：验证格式支持用户名@格式和数字ID
+      // 用户名格式：@channelusername
+      // 数字格式：-1001234567890 或 123456789
+      const isUsernameFormat = chatIdStr.startsWith('@');
+      const isNumericFormat = /^-?\d+$/.test(chatIdStr);
+      
+      if (!isUsernameFormat && !isNumericFormat) {
         console.warn('isChannelAdmin: 无效的chatId格式', chatIdStr);
         return false;
       }
@@ -2798,9 +2803,9 @@ class PanelHandler {
         // 🔒 额外安全检查：验证用户信息匹配
         if (isAdmin && result.result.user) {
           const user = result.result.user;
-          // 确保⬅️ 返回的用户ID与请求的userId匹配
+          // 确保返回的用户ID与请求的userId匹配
           if (String(user.id) !== userIdStr) {
-            console.warn('isChannelAdmin: ⬅️ 返回的用户ID不匹配', { requested: userIdStr, returned: user.id });
+            console.warn('isChannelAdmin: 返回的用户ID不匹配', { requested: userIdStr, returned: user.id });
             return false;
           }
 
@@ -2808,11 +2813,10 @@ class PanelHandler {
           console.log(`isChannelAdmin: 用户 ${userIdStr} 是频道 ${chatIdStr} 的 ${status}`);
         }
 
-        // 🔒 关键修复：必须返回 isAdmin 结果
         return isAdmin;
       }
 
-      // 如果API⬅️ 返回错误，记录详细信息
+      // 如果API返回错误，记录详细信息
       console.warn('isChannelAdmin: API调用失败', {
         chatId: chatIdStr,
         userId: userIdStr,
@@ -5496,12 +5500,16 @@ class BotHandler {
           return;
       }
 
+      // 🔧 修复：正确处理 targetId，保留用户名格式
       let targetId = chatArg;
+      
+      // 如果是纯数字（不带@或-），可能是用户想输入ID但忘了-100前缀
       if(!targetId.startsWith('@') && !targetId.startsWith('-') && /^\d+$/.test(targetId)) {
-        // UserID logic
-      } else if (!targetId.startsWith('-') && !targetId.startsWith('@')) {
-        targetId = `-${targetId}`;
+          // 纯数字，假设是频道ID，添加 -100 前缀
+          targetId = `-${targetId}`;
       }
+      // 如果是 @username 格式，保持原样
+      // 如果已经是 -100xxx 格式，保持原样
 
       // 🔒 新增：验证目标是否为频道（而非群组）
       // 首先获取聊天信息以验证类型
@@ -5523,23 +5531,25 @@ class BotHandler {
           return;
       }
 
+      // 🔧 关键修复：使用从 getChat 获取到的实际 ID（数字格式）进行权限检查
+      // 这样可以避免用户名格式在某些情况下导致的权限检查问题
+      const actualChatId = chatInfo.result.id;
+
       // 验证权限
-      if(!(await this.panelHandler.isChannelAdmin(targetId, userId))) {
+      if(!(await this.panelHandler.isChannelAdmin(actualChatId, userId))) {
           await this.api.sendMessage(userId, {text:"⛔ 权限不足：我必须是该频道的管理员，或者你在管理群里。\n请确保已将 Bot 添加为频道管理员。"});
           return;
       }
 
-      let actualId = targetId;
+      // 使用实际的数字ID进行后续操作
+      const actualId = actualChatId;
+
       try {
-          const info = await this.api.getChat(targetId);
-          if(info.ok) {
-              actualId = info.result.id;
-              // [优化] 既然验证成功且获取了信息，顺便缓存管理员关系
-              await this.configManager.addChannelAdmin(actualId, userId, info.result.title || info.result.username);
-              // 如果可能，触发全量同步 (不阻塞)
-              this.configManager.syncChannelAdmins(this.api, actualId);
-          }
-      } catch{}
+          // [优化] 既然验证成功且获取了信息，顺便缓存管理员关系
+          await this.configManager.addChannelAdmin(actualId, userId, chatInfo.result.title || chatInfo.result.username);
+          // 如果可能，触发全量同步 (不阻塞)
+          this.configManager.syncChannelAdmins(this.api, actualId);
+      } catch {}
 
       await this.panelHandler.renderMainMenu(userId, actualId);
   }
