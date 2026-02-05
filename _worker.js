@@ -2808,6 +2808,7 @@ class PanelHandler {
           console.log(`isChannelAdmin: 用户 ${userIdStr} 是频道 ${chatIdStr} 的 ${status}`);
         }
 
+        // 🔒 关键修复：必须返回 isAdmin 结果
         return isAdmin;
       }
 
@@ -5500,6 +5501,26 @@ class BotHandler {
         // UserID logic
       } else if (!targetId.startsWith('-') && !targetId.startsWith('@')) {
         targetId = `-${targetId}`;
+      }
+
+      // 🔒 新增：验证目标是否为频道（而非群组）
+      // 首先获取聊天信息以验证类型
+      let chatInfo;
+      try {
+          chatInfo = await this.api.getChat(targetId);
+          if (!chatInfo.ok) {
+              await this.api.sendMessage(userId, {text:"❌ 无法获取频道信息，请检查ID或用户名是否正确。"});
+              return;
+          }
+      } catch (error) {
+          await this.api.sendMessage(userId, {text:"❌ 无法获取频道信息，请检查ID或用户名是否正确，并确保Bot已加入该频道。"});
+          return;
+      }
+
+      // 验证是否为频道类型（channel）
+      if (chatInfo.result.type !== 'channel') {
+          await this.api.sendMessage(userId, {text:"❌ 只能设置频道（Channel），不能设置群组（Group）。请使用频道ID（以-100开头）或频道用户名（@channelusername）。"});
+          return;
       }
 
       // 验证权限
