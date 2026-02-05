@@ -5432,7 +5432,7 @@ class BotHandler {
   async _processPrivateMessage(message) {
       const text = message.text ? message.text.trim() : '';
 
-      // [优化] 如果是 set 指令，直接处理并⬅️ 返回，不再执行后续的用户状态检查
+      // [优化] 如果是 set 指令，直接处理并返回，不再执行后续的用户状态检查
       if (/^\/set(\s|$)/.test(text)) {
           return await this._handleSetCommand(message);
       }
@@ -5444,8 +5444,8 @@ class BotHandler {
                     state.action.startsWith('awaiting_import'))) {
 
         if (!state.originChatId || String(state.originChatId) === String(message.chat.id)) {
-            // 🔧 修复问题3: 同时支持 text 和 caption 的 entities
-      const entities = message.caption_entities || message.entities || [];
+            // 修复问题3: 同时支持 text 和 caption 的 entities
+            const entities = message.caption_entities || message.entities || [];
             if (state.config_key === 'footer_text') state.entities = entities;
 
             const keepState = await this.panelHandler.processUserConfigurationInput(userId, message.text || message.caption || '', state);
@@ -5457,14 +5457,22 @@ class BotHandler {
         }
       }
 
+      // 🔧 修复：/start 和 /about 命令统一处理
+      if (text.toLowerCase() === '/start' || text.toLowerCase() === '/about') {
+         const aboutText = `ChannelFlare Bot v${BOT_VERSION}
+
+<b>可用命令：</b>
+/set - 管理频道设置
+/help - 查看帮助
+/make - 手动处理消息
+/about - 关于`;
+         await this.api.sendMessage(message.chat.id, { text: aboutText, parse_mode: 'HTML' });
+         return;
+      }
+
       if (text.toLowerCase() === '/help') {
         await this.api.sendMessage(message.chat.id, { text: HELP_TEXT });
         return;
-      }
-
-      if (text.toLowerCase() === '/about') {
-         await this.api.sendMessage(message.chat.id, { text: `ChannelFlare Bot v${BOT_VERSION}` });
-         return;
       }
   }
 
