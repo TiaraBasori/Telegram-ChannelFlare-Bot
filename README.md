@@ -50,7 +50,7 @@
 1. 登录 [Cloudflare Workers](https://dash.cloudflare.com/)
 2. 点击 "Create a Service"
 3. 选择 "HTTP handler"
-4. 将 `_worker.js` 代码复制到编辑器中
+4. 将 [`../src/worker.js`](../../src/worker.js) 代码复制到编辑器中
 5. 点击 "Save and Deploy"
 
 #### 方法二：使用 Wrangler CLI 部署
@@ -174,7 +174,7 @@ BOT_TOKEN=你的Telegram_Bot_Token
 ## 🙏 致谢
 
 - 感谢 [Moist的私聊机器人](https://github.com/moistrr/TGbot-D1) 为项目的许多部分提供灵感
-- 感谢 [莫菲丝](https://t.me/mofeisi233) 赠予AI API
+- 感谢 [莫菲丝](https://t.me/mofeisi233) 赠予OpenAI API
 - 感谢朋友们的支持
 
 ## 📞 支持与反馈
