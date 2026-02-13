@@ -4691,7 +4691,7 @@ class MessageProcessor {
           if (forwardSource.url) {
               sourceEntities.push({
                   type: 'text_link',
-                  offset: prefix.length, // 链接只针对 Name，所以偏移是 prefix 长度
+                  offset: prefix.length + 1, // 链接只针对 Name，所以偏移需包含中间空格
                   length: sourceName.length,
                   url: forwardSource.url
               });
@@ -4734,7 +4734,7 @@ class MessageProcessor {
           if (forwardSource.url) {
               sourceEntities.push({
                   type: 'text_link',
-                  offset: prefix.length,
+                  offset: prefix.length + 1,
                   length: sourceName.length,
                   url: forwardSource.url
               });
