@@ -3203,17 +3203,22 @@ class PanelHandler {
 📖 严格模式说明:
 修改不直接生效
 先发到管理群预审
-管理员确认才发送`;
+管理员确认才发送
+
+🗑️ 自动删除系统消息: ${config.deleteSystemMessages ? '✅ 开启' : '❌ 关闭'}
+🧹 自动清理指令词: ${config.cleanCommands ? '✅ 开启' : '❌ 关闭'}`;
 
       const buttons = [
           { text: "📲 绑定管理群", callback_data: `panel:management_group:${chatId}` },
           { text: isStrict ? "❌ 关闭严格模式" : "✅ 开启严格模式", callback_data: `panel:toggle:${chatId}:strictMode:${!isStrict}` },
+          { text: config.deleteSystemMessages ? "❌ 关闭系统消息删除" : "✅ 开启系统消息删除", callback_data: `panel:toggle:${chatId}:deleteSystemMessages:${!config.deleteSystemMessages}` },
+          { text: config.cleanCommands ? "❌ 关闭指令清理" : "✅ 开启指令清理", callback_data: `panel:toggle:${chatId}:cleanCommands:${!config.cleanCommands}` },
           { text: "🔙 返回主菜单", callback_data: `panel:back:${chatId}` }
       ];
 
       const keyboard = { inline_keyboard: [
         ...Utils.chunkArray(buttons.slice(0, -1), 1),
-        [buttons[2]]
+        [buttons[4]]
       ] };
 
       if (messageId) {
@@ -3898,7 +3903,7 @@ ${keywordApiStatus}
       case 'cleanCommands':
         config.cleanCommands = value === 'true';
         await this.configManager.setConfig(chatId, config);
-        await this.renderMainMenu(targetChatId, chatId, messageId);
+        await this.renderSecurityMenu(targetChatId, chatId, messageId);
         break;
       case 'forwardTarget':
         const nextTarget = value === 'all' ? 'channel' : value === 'channel' ? 'user' : 'all';
@@ -3920,6 +3925,7 @@ ${keywordApiStatus}
       case 'deleteSystemMessages':
         config.deleteSystemMessages = value === 'true';
         await this.configManager.setConfig(chatId, config);
+        await this.renderSecurityMenu(targetChatId, chatId, messageId);
         break;
       case 'ai_rewrite':
         if (!config.ai?.rewrite?.apiKey || !config.ai?.rewrite?.apiBaseUrl) {
