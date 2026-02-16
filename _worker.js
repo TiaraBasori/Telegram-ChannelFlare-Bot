@@ -2265,11 +2265,13 @@ class ConfigManager {
   async syncChannelAdmins(api, channelId) {
       if (!this.db) return;
       try {
-          // ⚠️ 表结构已初始化
+          // 🔒 严格验证：仅同步频道（channel）类型，跳过群组/私聊
           const chat = await api.getChat(channelId);
-          if (!chat.ok) return;
+          if (!chat.ok || chat.result.type !== 'channel') {
+              console.log(`syncChannelAdmins: 跳过非频道实体 (ID: ${channelId}, Type: ${chat.result?.type})`);
+              return;
+          }
           const title = chat.result.title || chat.result.username || channelId;
-
           const adminsRes = await api.request('getChatAdministrators', { chat_id: channelId });
           if (!adminsRes.ok || !adminsRes.result) return;
 
@@ -2284,7 +2286,7 @@ class ConfigManager {
               const user = member.user;
               if (user.is_bot) continue; // 跳过机器人
               stmts.push(this.db.prepare(
-                 'INSERT OR IGNORE INTO users (channel_id, user_id, channel_title, updated_at) VALUES (?, ?, ?, ?)'
+                  'INSERT OR IGNORE INTO users (channel_id, user_id, channel_title, updated_at) VALUES (?, ?, ?, ?)'
               ).bind(String(channelId), String(user.id), title, timestamp));
           }
 
@@ -2295,14 +2297,14 @@ class ConfigManager {
           console.error('同步管理员错误', e);
       }
   }
-
+  
   // [新增] 单独添加一条管理员记录
   async addChannelAdmin(channelId, userId, channelTitle) {
       if (!this.db) return;
       try {
           // ⚠️ 表结构已初始化
           await this.db.prepare(
-             'INSERT OR IGNORE INTO users (channel_id, user_id, channel_title, updated_at) VALUES (?, ?, ?, ?)'
+              'INSERT OR IGNORE INTO users (channel_id, user_id, channel_title, updated_at) VALUES (?, ?, ?, ?)'
           ).bind(String(channelId), String(userId), channelTitle, Date.now()).run();
       } catch (e) {
           console.error("添加管理员错误", e);
@@ -5496,9 +5498,10 @@ class BotHandler {
 
       // [优化] 如果是在群组/频道内直接使用 /set，自动同步管理员
       if (['group', 'supergroup', 'channel'].includes(message.chat.type)) {
-          // 在频道内无法直接回复用户，通常机器人是管理员
-          // 同步管理员列表到数据库
-          await this.configManager.syncChannelAdmins(this.api, message.chat.id);
+          // 🔒 仅对频道类型执行管理员同步（防止群组ID污染users表）
+          if (message.chat.type === 'channel') {
+              await this.configManager.syncChannelAdmins(this.api, message.chat.id);
+          }
 
           // 如果是群组，且有绑定关系，显示选择器
           if (['group', 'supergroup'].includes(message.chat.type)) {
@@ -5627,6 +5630,18 @@ class BotHandler {
     const chatId = message.chat.id;
     await this.configManager.ensureConfig(chatId);
     const config = await this.configManager.getConfig(chatId);
+
+    // 🔒 问题2修复：非回复的 /make 命令必须立即删除（无论 cleanCommands 状态）
+    const msgText = (message.text || message.caption || '').trim();
+    if (msgText.startsWith(`/${TRIGGER_COMMAND}`) && !Utils.isReplyToBotCommand(message)) {
+        try {
+            await this.api.deleteMessage(chatId, message.message_id);
+            console.log(`[Cleanup] 已删除非回复的 /${TRIGGER_COMMAND} 命令消息`);
+        } catch (e) {
+            console.error('删除 /make 命令失败:', e);
+        }
+        return;
+    }
 
     const messageText = message.text || message.caption || '';
     const parsedDirectives = Utils.parseMessageDirectives(messageText);
@@ -5840,11 +5855,9 @@ class BotHandler {
       // 优先使用 message.caption（媒体消息），其次使用 message.text（纯文本消息）
       let rawText = message.caption || message.text || '';
 
-      if (directivesResult && directivesResult.hasDirectives) {
+      // 🔒 问题2修复：仅当 cleanCommands=true 且存在指令时才清理
+      if (config.cleanCommands && directivesResult && directivesResult.hasDirectives) {
           rawText = Utils.cleanDirectiveLine(rawText, directivesResult);
-      } else if (config.cleanCommands) {
-          const parseAgain = Utils.parseMessageDirectives(rawText);
-          if(parseAgain.hasDirectives) rawText = Utils.cleanDirectiveLine(rawText, parseAgain);
       }
 
       // 🔧 修复问题3: 同时支持 text 和 caption 的 entities
