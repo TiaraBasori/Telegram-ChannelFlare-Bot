@@ -1285,7 +1285,8 @@ class TelegramAPI {
   // 构造函数：初始化 Telegram Bot API 客户端，需要有效的 Bot Token
   constructor(token) {
     if (!token) throw new Error('Telegram Bot Token 未提供，无法初始化 API 客户端');
-    this.baseUrl = `https://api.telegram.org/bot${token.trim()}`;
+    this.token = token.trim();  // ✅ 保存 token
+    this.baseUrl = `https://api.telegram.org/bot${this.token}`;
   }
 
   // 通用 POST 请求方法：发送请求到 Telegram API
@@ -3383,23 +3384,39 @@ ${config.footer.enabled ? `\n👀 签名预览:
   }
 
   async renderFooterPreview(targetChatId, chatId, messageId = null) {
-    const config = await this.configManager.getConfig(chatId);
-    if (!config.footer.enabled || !config.footer.text) {
-      return;
-    }
-    const keyboard = { inline_keyboard: [[{ text: "🔙 返回", callback_data: `panel:footer:${chatId}` }]] };
-
-    const html = Utils.telegramEntitiesToHtml(config.footer.text, config.footer.entities || []);
-
-    if (messageId) {
-      try {
-        await this.api.editMessageText(targetChatId, messageId, html, { reply_markup: keyboard });
-      } catch (e) {
-        await this.api.sendMessage(targetChatId, { text: html, replyMarkup: keyboard });
+      const config = await this.configManager.getConfig(chatId);
+      if (!config.footer.enabled || !config.footer.text) {
+          return;
       }
-    } else {
-      await this.api.sendMessage(targetChatId, { text: html, replyMarkup: keyboard });
-    }
+      const keyboard = { inline_keyboard: [[{ text: "🔙 返回", callback_data: `panel:footer:${chatId}` }]] };
+      const html = Utils.telegramEntitiesToHtml(config.footer.text, config.footer.entities || []).trim();
+
+      // 确保转换后的文本不为空
+      if (!html) {
+          return;
+      }
+
+      if (messageId) {
+          try {
+              await this.api.editMessageText(targetChatId, messageId, html, {
+                  parse_mode: "HTML",
+                  reply_markup: keyboard,
+                  link_preview_options: { is_disabled: true }
+              });
+          } catch (e) {
+              await this.api.sendMessage(targetChatId, html, {
+                  parse_mode: "HTML",
+                  reply_markup: keyboard,
+                  link_preview_options: { is_disabled: true }
+              });
+          }
+      } else {
+          await this.api.sendMessage(targetChatId, html, {
+              parse_mode: "HTML",
+              reply_markup: keyboard,
+              link_preview_options: { is_disabled: true }
+          });
+      }
   }
 
   async renderButtonsSettingsMenu(targetChatId, chatId, messageId = null) {
