@@ -4321,71 +4321,60 @@ ${keywordApiStatus}
         case 'management_group_id': {
           const val = text.toLowerCase().trim();
           if (val === 'clear' || val === 'none') {
-             const oldGroupId = config.managementGroupId;
-             config.managementGroupId = '';
-             config.strictMode = false; // 移除管理群组时必须关闭🔒 严格模式
-             await this.configManager.setConfig(chatId, config);
-
-             // [修复] 改为彻底清理该频道的所有群组绑定，不仅仅是 config 中记录的旧 ID
-             // 同时也会清理旧表 group_bindings 中的死数据
-             await this.configManager.removeChannelBinding(chatId);
-
-             await deleteAndNotify("✅ 管理群组已解绑。");
+            const oldGroupId = config.managementGroupId;
+            config.managementGroupId = '';
+            config.strictMode = false;
+            await this.configManager.setConfig(chatId, config);
+            await this.configManager.removeChannelBinding(chatId);
+            await deleteAndNotify("✅ 管理群组已解绑。");
           } else {
-             // 🔒 强化管理群组验证：验证Bot确实是该群组管理员，且群组真实存在
-             try {
-                 // 1. 验证群组真实存在
-                 const chatInfo = await this.api.getChat(val);
-                 if (!chatInfo.ok) {
-                     await this.api.sendMessage(replyTargetId, { text: "❌ 无法获取群组信息，请检查群组ID是否正确，并确保机器人已加入该群组。" });
-                     return false;
-                 }
+            try {
+              const chatInfo = await this.api.getChat(val);
+              if (!chatInfo.ok) {
+                await this.api.sendMessage(replyTargetId, { text: "❌ 无法获取群组信息，请检查群组ID是否正确，并确保机器人已加入该群组。" });
+                return false;
+              }
 
-                 const chat = chatInfo.result;
+              const chat = chatInfo.result;
 
-                 // 2. 验证群组类型（必须是群组或超级群组）
-                 if (chat.type !== 'group' && chat.type !== 'supergroup') {
-                     await this.api.sendMessage(replyTargetId, { text: "❌ 只能绑定群组或超级群组，不能绑定频道或私聊。" });
-                     return false;
-                 }
+              if (chat.type !== 'group' && chat.type !== 'supergroup') {
+                await this.api.sendMessage(replyTargetId, { text: "❌ 只能绑定群组或超级群组，不能绑定频道或私聊。" });
+                return false;
+              }
 
-                 // 3. 验证机器人是该群组的管理员
-                 // 从Bot Token中提取Bot ID
-                 const botTokenParts = this.api.token.split(':');
-                 if (botTokenParts.length < 2) {
-                     throw new Error('Bot Token格式无效');
-                 }
-                 const botId = botTokenParts[0];
+              const botInfo = await this.api.request('getMe');
+              if (!botInfo.ok) {
+                throw new Error('无法获取机器人信息');
+              }
+              const botId = botInfo.result.id;
 
-                 const botMember = await this.api.getChatMember(val, botId);
-                 if (!botMember.ok || (botMember.result.status !== 'administrator' && botMember.result.status !== 'creator')) {
-                     await this.api.sendMessage(replyTargetId, { text: "❌ 机器人不是该群组的管理员，请先将机器人添加为群组管理员。" });
-                     return false;
-                 }
+              const botMember = await this.api.getChatMember(val, botId);
+              if (!botMember.ok || (botMember.result.status !== 'administrator' && botMember.result.status !== 'creator')) {
+                await this.api.sendMessage(replyTargetId, { text: "❌ 机器人不是该群组的管理员，请先将机器人添加为群组管理员。" });
+                return false;
+              }
 
-                 // 4. 验证通过，进行绑定
-                 const oldGroupId = config.managementGroupId;
-                 config.managementGroupId = val;
-                 await this.configManager.setConfig(chatId, config);
+              const oldGroupId = config.managementGroupId;
+              config.managementGroupId = val;
+              await this.configManager.setConfig(chatId, config);
 
-                 // [修复] 确保旧绑定被移除 (如果更换了群组)
-                 if (oldGroupId && oldGroupId !== val) {
-                     await this.configManager.unbindGroup(oldGroupId, chatId);
-                 }
+              if (oldGroupId && oldGroupId !== val) {
+                await this.configManager.unbindGroup(oldGroupId, chatId);
+              }
 
-                 // 建立新的绑定关系 (允许该群组绑定多个频道)
-                 const bindSuccess = await this.configManager.bindGroup(val, chatId);
+              const bindSuccess = await this.configManager.bindGroup(val, chatId);
 
-                 if (bindSuccess) {
-                    await deleteAndNotify(`✅ 绑定成功！\n群组: ${chat.title || chat.username || val}\nID: ${val}`);
-                 } else {
-                    await this.api.sendMessage(replyTargetId, { text: "❌ 数据库绑定失败，请确保机器人拥有写权限。" });
-                 }
-             } catch (error) {
-                 console.error('管理群组验证失败:', error);
-                 await this.api.sendMessage(replyTargetId, { text: `❌ 验证失败: ${error.message}` });
-                 return false;
-             }
+              if (bindSuccess) {
+                await deleteAndNotify(`✅ 绑定成功！\n群组: ${chat.title || chat.username || val}\nID: ${val}`);
+              } else {
+                await this.api.sendMessage(replyTargetId, { text: "❌ 数据库绑定失败，请确保机器人拥有写权限。" });
+                return false;
+              }
+            } catch (error) {
+              console.error('管理群组验证失败:', error);
+              await this.api.sendMessage(replyTargetId, { text: `❌ 验证失败: ${error.message}` });
+              return false;
+            }
           }
           await this.renderSecurityMenu(replyTargetId, chatId);
           break;
